@@ -5,14 +5,8 @@ import glob
 import numpy as np
 import random
 import base64
-
-# 尝试导入OpenAI，如果失败则使用降级方案
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    st.warning("⚠️ OpenAI库未安装，部分功能将使用本地数据")
+import requests
+import json
 
 # 页面配置
 st.set_page_config(
@@ -221,23 +215,35 @@ def set_simple_style():
 
 set_simple_style()
 
-# -------------------- 初始化OpenAI客户端 --------------------
-def get_openai_client():
-    """获取OpenAI客户端，如果不可用则返回None"""
-    if not OPENAI_AVAILABLE:
-        return None
+# -------------------- DeepSeek API 客户端 --------------------
+def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
+    """直接调用DeepSeek API"""
+    api_key = "sk-72997944466a4af2bcd52a068895f8cf"
+    url = "https://api.deepseek.com/chat/completions"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    data = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False
+    }
     
     try:
-        client = OpenAI(
-            api_key="sk-72997944466a4af2bcd52a068895f8cf",
-            base_url="https://api.deepseek.com"
-        )
-        return client
+        response = requests.post(url, headers=headers, data=json.dumps(data), timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content'].strip()
     except Exception as e:
-        st.error(f"OpenAI客户端初始化失败: {e}")
+        st.error(f"API调用失败: {e}")
         return None
-
-client = get_openai_client()
 
 # -------------------- 会话状态初始化 --------------------
 def init_session_state():
@@ -469,10 +475,9 @@ def display_media(song_meta, zodiac):
 
 def generate_specific_recommendation(recommendation_type, zodiac, birth_year, place, birth_hour, gender):
     """生成特定类型的推荐"""
-    # 如果OpenAI不可用，使用本地数据
-    if not client:
-        local_data = LOCAL_RECOMMENDATIONS.get(recommendation_type, {})
-        return local_data.get(zodiac, f"暂无{recommendation_type}的本地推荐数据")
+    # 使用本地数据作为降级方案
+    local_data = LOCAL_RECOMMENDATIONS.get(recommendation_type, {})
+    local_result = local_data.get(zodiac, f"暂无{recommendation_type}的本地推荐数据")
     
     prompts = {
         "工作类型": f"基于生肖{zodiac}、{birth_year}年出生、{place}人、{gender}性的特点，推荐3个最适合的工作类型，并说明理由",
@@ -487,20 +492,15 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_year, pl
     
     prompt = prompts.get(recommendation_type, "")
     if not prompt:
-        return "暂无该类型的推荐信息"
+        return local_result
     
-    try:
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=300
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        # 如果API调用失败，使用本地数据
-        local_data = LOCAL_RECOMMENDATIONS.get(recommendation_type, {})
-        return local_data.get(zodiac, f"暂时无法生成{recommendation_type}推荐，请稍后再试。")
+    # 调用DeepSeek API
+    api_result = call_deepseek_api(prompt, max_tokens=300, temperature=0.7)
+    
+    if api_result:
+        return api_result
+    else:
+        return local_result
 
 def should_regenerate_fortune():
     """检查是否需要重新生成运势"""
@@ -513,51 +513,46 @@ def should_regenerate_fortune():
 
 def generate_daily_fortune(zodiac, birth_info):
     """生成今日运势"""
-    # 如果OpenAI不可用，使用本地运势
-    if not client:
-        fortunes = [
-            f"今日{get_zodiac_description(zodiac)}，运势平稳，保持积极心态。",
-            f"生肖{zodiac}今日贵人运佳，多与人交流会有意外收获。",
-            f"今天适合{get_zodiac_description(zodiac).split('，')[0]}，把握机会展现自己。",
-            f"{zodiac}生肖今日财运不错，但要注意理性消费。",
-            f"今日感情运势良好，{get_zodiac_description(zodiac)}的特质会为你加分。"
-        ]
-        return random.choice(fortunes)
+    # 使用本地运势作为降级方案
+    fortunes = [
+        f"今日{get_zodiac_description(zodiac)}，运势平稳，保持积极心态。",
+        f"生肖{zodiac}今日贵人运佳，多与人交流会有意外收获。",
+        f"今天适合{get_zodiac_description(zodiac).split('，')[0]}，把握机会展现自己。",
+        f"{zodiac}生肖今日财运不错，但要注意理性消费。",
+        f"今日感情运势良好，{get_zodiac_description(zodiac)}的特质会为你加分。"
+    ]
+    local_fortune = random.choice(fortunes)
     
-    try:
-        prompt = f"""
-        用户生肖：{zodiac}
-        出生年份：{birth_info['year']}
-        性别：{birth_info['gender']}
-        当前日期：{datetime.now().strftime('%Y年%m月%d日')}
-        
-        生成简短精准的今日运势（60字左右），语言温暖、简洁。
-        """
+    prompt = f"""
+    用户生肖：{zodiac}
+    出生年份：{birth_info['year']}
+    性别：{birth_info['gender']}
+    当前日期：{datetime.now().strftime('%Y年%m月%d日')}
+    
+    生成简短精准的今日运势（60字左右），语言温暖、简洁。
+    """
 
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=150
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return "今日运势平稳，保持积极心态，好事自然来。注意与人沟通，避免小误会。"
+    # 调用DeepSeek API
+    api_result = call_deepseek_api(prompt, max_tokens=150, temperature=0.7)
+    
+    if api_result:
+        return api_result
+    else:
+        return local_fortune
 
 def chat_with_ai(user_message, birth_info, zodiac):
     """与AI聊天"""
     if not birth_info:
         return "请先在主页输入您的八字信息。"
     
-    # 如果OpenAI不可用，使用简单回复
-    if not client:
-        responses = [
-            "基于您的生肖信息，建议保持积极心态，好事自然会来。",
-            f"生肖{zodiac}通常{get_zodiac_description(zodiac).lower()}，在这方面多加发挥会有不错的结果。",
-            "这个问题需要更多个人信息来分析，请确保已输入完整的八字信息。",
-            "传统命理强调顺势而为，建议根据当前情况灵活调整策略。"
-        ]
-        return random.choice(responses)
+    # 使用简单回复作为降级方案
+    responses = [
+        "基于您的生肖信息，建议保持积极心态，好事自然会来。",
+        f"生肖{zodiac}通常{get_zodiac_description(zodiac).lower()}，在这方面多加发挥会有不错的结果。",
+        "这个问题需要更多个人信息来分析，请确保已输入完整的八字信息。",
+        "传统命理强调顺势而为，建议根据当前情况灵活调整策略。"
+    ]
+    local_response = random.choice(responses)
     
     prompt = f"""
     用户信息：
@@ -569,16 +564,13 @@ def chat_with_ai(user_message, birth_info, zodiac):
     请基于用户的八字信息和生肖特点，给出专业、温暖的回答。
     """
     
-    try:
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=300
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return "抱歉，我现在无法回答您的问题。请稍后再试。"
+    # 调用DeepSeek API
+    api_result = call_deepseek_api(prompt, max_tokens=300, temperature=0.7)
+    
+    if api_result:
+        return api_result
+    else:
+        return local_response
 
 def render_chat_interface():
     """显示聊天界面"""
