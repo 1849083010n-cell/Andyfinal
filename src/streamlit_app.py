@@ -448,7 +448,7 @@ def load_media_resources():
         st.session_state.zodiac_videos = zodiac_videos
         st.session_state.media_indexed = True
         
-        st.success(f"✅ 加载了 {len(songs)} 首音乐, {len(all_images)} 张图片和 {len(zodiac_videos)} 个生肖动图")
+        st.success(f"")
         
     except Exception as e:
         st.error(f"加载媒体资源时出错: {e}")
