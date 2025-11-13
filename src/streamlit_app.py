@@ -5,7 +5,6 @@ import glob
 import numpy as np
 import random
 import base64
-import openai
 
 # 页面配置
 st.set_page_config(
