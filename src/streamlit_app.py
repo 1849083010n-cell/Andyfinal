@@ -5,6 +5,7 @@ import glob
 import numpy as np
 import random
 import base64
+
 # 尝试导入OpenAI，如果失败则使用降级方案
 try:
     from openai import OpenAI
@@ -336,43 +337,91 @@ def load_media_resources():
         all_images = []
         zodiac_videos = {}
 
-        # 加载音乐
+        # 加载音乐 - 修复搜索路径
         music_dirs = ["src/music", "./src/music", "music", "./music"]
         for music_dir in music_dirs:
             if os.path.exists(music_dir):
-                for ext in ("*.mp3", "*.wav", "*.m4a"):
-                    music_files = glob.glob(os.path.join(music_dir, ext))
+                st.write(f"🔍 搜索音乐目录: {music_dir}")
+                # 使用递归搜索来查找所有子目录中的mp3文件
+                for ext in ["*.mp3", "*.MP3"]:
+                    # 使用递归搜索模式
+                    search_pattern = os.path.join(music_dir, "**", ext)
+                    music_files = glob.glob(search_pattern, recursive=True)
+                    
+                    # 同时搜索当前目录
+                    current_dir_files = glob.glob(os.path.join(music_dir, ext))
+                    music_files.extend(current_dir_files)
+                    
                     for p in music_files:
                         if os.path.isfile(p):
-                            fname = os.path.basename(p)
-                            name_no_ext = os.path.splitext(fname)[0]
-                            songs.append({
-                                "filename": fname,
-                                "title": name_no_ext,
-                                "emotion": "中性",
-                                "path": p
-                            })
+                            try:
+                                fname = os.path.basename(p)
+                                name_no_ext = os.path.splitext(fname)[0]
+                                
+                                # 解析文件名获取情感标签
+                                emotion = "中性"
+                                title = name_no_ext
+                                
+                                # 尝试从文件名解析情感标签
+                                if " - " in name_no_ext:
+                                    parts = name_no_ext.split(" - ")
+                                    if len(parts) >= 2:
+                                        emotion = parts[0].strip()
+                                        title = " - ".join(parts[1:]).strip()
+                                elif "_" in name_no_ext:
+                                    parts = name_no_ext.split("_")
+                                    if len(parts) >= 2:
+                                        emotion = parts[0].strip()
+                                        title = "_".join(parts[1:]).strip()
+                                
+                                # 自动识别情感关键词
+                                emotion_lower = emotion.lower()
+                                if any(word in emotion_lower for word in ["快乐", "开心", "喜悦", "高兴"]):
+                                    emotion = "快乐"
+                                elif any(word in emotion_lower for word in ["平静", "安宁", "放松", "冥想"]):
+                                    emotion = "平静"
+                                elif any(word in emotion_lower for word in ["悲伤", "忧郁", "伤感"]):
+                                    emotion = "悲伤"
+                                elif any(word in emotion_lower for word in ["浪漫", "爱情", "温柔"]):
+                                    emotion = "浪漫"
+                                elif any(word in emotion_lower for word in ["振奋", "激情", "活力"]):
+                                    emotion = "振奋"
+                                
+                                song_data = {
+                                    "filename": fname,
+                                    "title": title,
+                                    "emotion": emotion,
+                                    "path": p
+                                }
+                                songs.append(song_data)
+                                st.write(f"🎵 加载音乐: {title} ({emotion})")
+                                
+                            except Exception as e:
+                                st.warning(f"跳过异常音乐文件 {fname}: {e}")
 
         # 加载图片和视频
         image_dirs = ["src/images", "./src/images", "images", "./images"]
         for image_dir in image_dirs:
             if os.path.exists(image_dir):
+                st.write(f"🔍 搜索媒体目录: {image_dir}")
+                
                 # 加载静态图片
                 for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-                    image_files = glob.glob(os.path.join(image_dir, ext))
+                    image_files = glob.glob(os.path.join(image_dir, "**", ext), recursive=True)
                     for p in image_files:
                         if os.path.isfile(p):
                             all_images.append(p)
                 
                 # 加载生肖动图
                 for ext in ("*.mp4", "*.MP4"):
-                    video_files = glob.glob(os.path.join(image_dir, ext))
+                    video_files = glob.glob(os.path.join(image_dir, "**", ext), recursive=True)
                     for p in video_files:
                         if os.path.isfile(p):
                             filename = os.path.basename(p).lower()
                             for zodiac in ZODIAC:
                                 if zodiac in filename:
                                     zodiac_videos[zodiac] = p
+                                    st.write(f"🎬 加载生肖动图: {zodiac}")
                                     break
 
         st.session_state.songs_meta = songs
@@ -380,7 +429,15 @@ def load_media_resources():
         st.session_state.zodiac_videos = zodiac_videos
         st.session_state.media_indexed = True
         
-        st.success(f"✅ 加载了 {len(songs)} 首音乐, {len(all_images)} 张图片和 {len(zodiac_videos)} 个生肖动图")
+        st.success(f"✅ 加载完成: {len(songs)} 首音乐, {len(all_images)} 张图片, {len(zodiac_videos)} 个生肖动图")
+        
+        # 显示加载的音乐列表
+        if songs:
+            st.write("### 📋 已加载的音乐列表:")
+            for i, song in enumerate(songs[:10]):  # 只显示前10首
+                st.write(f"{i+1}. {song['title']} - {song['emotion']}")
+            if len(songs) > 10:
+                st.write(f"... 还有 {len(songs) - 10} 首音乐")
         
     except Exception as e:
         st.error(f"加载媒体资源时出错: {e}")
@@ -389,23 +446,51 @@ def match_song_by_text(text: str, top_k=1):
     """简化版音乐匹配"""
     songs = st.session_state.songs_meta
     if not songs:
+        st.warning("⚠️ 没有可用的音乐文件")
         return []
 
     text_lower = text.lower()
     matched_songs = []
     
+    # 情感关键词映射
+    emotion_keywords = {
+        "快乐": ["快乐", "开心", "喜悦", "幸福", "愉快", "高兴", "好运", "顺利", "成功", "幸运"],
+        "悲伤": ["悲伤", "难过", "伤心", "忧郁", "失落", "痛苦", "困难", "挫折", "挑战"],
+        "平静": ["平静", "安宁", "安静", "平和", "稳定", "放松", "休息", "冥想", "冷静"],
+        "浪漫": ["浪漫", "爱情", "恋爱", "甜蜜", "温柔", "心动", "缘分", "感情", "姻缘"],
+        "振奋": ["振奋", "兴奋", "激动", "热情", "活力", "充满", "积极", "动力", "能量"]
+    }
+    
     for song in songs:
         score = 0
+        song_emotion = song['emotion']
         song_title = song['title'].lower()
         
-        if any(word in text_lower for word in ["快乐", "开心", "喜悦"]):
+        # 基于情感标签匹配
+        for emotion, keywords in emotion_keywords.items():
+            if emotion == song_emotion:
+                for keyword in keywords:
+                    if keyword in text_lower:
+                        score += 3  # 情感匹配权重更高
+                        break
+        
+        # 基于标题关键词匹配
+        for keyword in text_lower.split():
+            if len(keyword) > 1 and keyword in song_title:
+                score += 1
+        
+        # 特殊运势关键词匹配
+        if "好运" in text_lower and song_emotion in ["快乐", "振奋"]:
             score += 2
-        if any(word in text_lower for word in ["平静", "安宁", "放松"]):
+        if "注意" in text_lower and song_emotion in ["平静"]:
             score += 1
-            
+        if "感情" in text_lower and song_emotion in ["浪漫"]:
+            score += 2
+        
         if score > 0:
             matched_songs.append((score, song))
     
+    # 如果没有匹配的，随机选择一首
     if not matched_songs and songs:
         matched_songs.append((1, random.choice(songs)))
     
@@ -447,11 +532,24 @@ def display_media(song_meta, zodiac):
         
         if os.path.exists(song_meta["path"]):
             try:
-                st.audio(song_meta["path"])
+                # 显示文件信息（调试用）
+                file_size = os.path.getsize(song_meta["path"]) / 1024 / 1024
+                st.write(f"**文件大小：** {file_size:.2f} MB")
+                
+                # 播放音乐
+                st.audio(song_meta["path"], format="audio/mp3")
+                
             except Exception as e:
                 st.error(f"播放音乐失败: {e}")
+                # 尝试直接使用文件路径
+                try:
+                    st.audio(song_meta["path"])
+                except Exception as e2:
+                    st.error(f"备用播放方式也失败: {e2}")
         else:
-            st.error("音乐文件不存在")
+            st.error(f"音乐文件不存在：{song_meta['path']}")
+
+# ... 其余函数保持不变（generate_specific_recommendation, should_regenerate_fortune, generate_daily_fortune, chat_with_ai, render_chat_interface, render_home_page, render_daily_fortune, render_personal_recommendation, main）
 
 def generate_specific_recommendation(recommendation_type, zodiac, birth_year, place, birth_hour, gender):
     """生成特定类型的推荐"""
@@ -683,7 +781,13 @@ def render_daily_fortune():
     if st.session_state.songs_meta:
         matched_songs = match_song_by_text(st.session_state.daily_fortune, 1)
         if matched_songs:
-            display_media(matched_songs[0][1], zodiac)
+            score, song = matched_songs[0]
+            st.write(f"🎯 匹配度: {score}")
+            display_media(song, zodiac)
+        else:
+            st.warning("暂无匹配的音乐推荐")
+    else:
+        st.info("🎵 音乐功能准备中...")
 
     render_chat_interface()
     
