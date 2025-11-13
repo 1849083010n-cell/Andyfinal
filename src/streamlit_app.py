@@ -11,7 +11,7 @@ import json
 # 页面配置
 st.set_page_config(
     page_title="小神龙",
-    page_icon="🐲�",
+    page_icon="🐲",
     layout="centered"
 )
 
@@ -400,7 +400,7 @@ def load_media_resources():
         st.session_state.zodiac_videos = zodiac_videos
         st.session_state.media_indexed = True
         
-        st.success(f"✅ ")
+        st.success(f"🐲")
         
     except Exception as e:
         st.error(f"加载媒体资源时出错: {e}")
