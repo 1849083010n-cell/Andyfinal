@@ -10,7 +10,7 @@ import json
 
 # 页面配置
 st.set_page_config(
-    page_title="�小神龙",
+    page_title="🐲小神龙",
     page_icon="🐲",
     layout="centered"
 )
