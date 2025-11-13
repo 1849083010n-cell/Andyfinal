@@ -805,3 +805,4 @@ def render_home_page():
         st.markdown(f"""
         <div class="zodiac-section">
             <h1>{get_zodiac_emoji(zodiac)} {zodiac}</h1>
+        )
