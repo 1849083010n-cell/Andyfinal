@@ -5,14 +5,7 @@ import glob
 import numpy as np
 import random
 import base64
-
-# 尝试导入OpenAI，如果失败则使用降级方案
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    st.warning("⚠️ OpenAI库未安装，部分功能将使用本地数据")
+import openai
 
 # 页面配置
 st.set_page_config(
