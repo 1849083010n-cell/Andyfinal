@@ -225,6 +225,21 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
+
+
+    
+    # 默认系统角色 - 专业八字命理师
+    if system_role is None:
+        system_role = """你是一个中国传统八字命理的专业研究人员。
+        你熟读《穷通宝典》、《三命通会》、《滴天髓》、《渊海子平》、《千里命稿》、《协纪辨方书》、《果老星宗》、《子平真诠》、《神峰通考》等一系列经典命理书籍。
+        你精通八字排盘、日主分析、十神配置、大运流年等命理技术。
+        请基于专业的八字命理知识，结合用户的个人信息，给出准确、专业、实用的命理分析。
+        回答时要体现专业深度，同时要温暖贴心，让用户容易理解。"""
+        
+        messages = []
+    if system_role:
+        messages.append({"role": "system", "content": system_role})
+    messages.append({"role": "user", "content": prompt})
     
     data = {
         "model": "deepseek-chat",
