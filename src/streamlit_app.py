@@ -10,8 +10,8 @@ import json
 
 # 页面配置
 st.set_page_config(
-    page_title="八字塔罗运势",
-    page_icon="🔮",
+    page_title="小神龙",
+    page_icon="🐲�",
     layout="centered"
 )
 
