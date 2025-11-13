@@ -5,14 +5,11 @@ import glob
 import numpy as np
 import random
 import base64
-
-# 尝试导入OpenAI，如果失败则使用降级方案
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    st.warning("⚠️ OpenAI库未安装，部分功能将使用本地数据")
+# 初始化OpenAI客户端
+client = OpenAI(
+    api_key="sk-72997944466a4af2bcd52a068895f8cf",
+    base_url="https://api.deepseek.com"
+)
 
 # 页面配置
 st.set_page_config(
@@ -221,23 +218,11 @@ def set_simple_style():
 
 set_simple_style()
 
-# -------------------- 初始化OpenAI客户端 --------------------
-def get_openai_client():
-    """获取OpenAI客户端，如果不可用则返回None"""
-    if not OPENAI_AVAILABLE:
-        return None
-    
-    try:
-        client = OpenAI(
-            api_key="sk-72997944466a4af2bcd52a068895f8cf",
-            base_url="https://api.deepseek.com"
-        )
-        return client
-    except Exception as e:
-        st.error(f"OpenAI客户端初始化失败: {e}")
-        return None
-
-client = get_openai_client()
+# 初始化OpenAI客户端
+client = OpenAI(
+    api_key="sk-72997944466a4af2bcd52a068895f8cf",
+    base_url="https://api.deepseek.com"
+)
 
 # -------------------- 会话状态初始化 --------------------
 def init_session_state():
