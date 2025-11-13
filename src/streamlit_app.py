@@ -715,7 +715,7 @@ def render_chat_interface(birth_info, bazi_info, zodiac):
 
 # -------------------- 页面组件 --------------------
 def render_home_page():
-    st.title("🐲小神龙Little Mystery Dragon）")
+    st.title("🐲小神龙Little Mystery Dragon")
     st.subheader("✨ 我是小神龙，欢迎与我交流，探索您的专属推荐")
 
     if not st.session_state.media_indexed:
