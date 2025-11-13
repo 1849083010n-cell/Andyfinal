@@ -596,8 +596,8 @@ def render_chat_interface():
 
 # -------------------- 页面组件 --------------------
 def render_home_page():
-    st.title("🔮 八字塔罗运势")
-    st.subheader("✨ 输入您的八字信息，探索专属运势")
+    st.title("🐲小神龙（Mystery Dragon）")
+    st.subheader("✨ 我是小神龙，来聊聊天，探索您的今日专属推荐吧")
 
     if not st.session_state.media_indexed:
         with st.spinner("📂 加载媒体资源..."):
