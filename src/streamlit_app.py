@@ -10,8 +10,8 @@ import json
 
 # 页面配置
 st.set_page_config(
-    page_title="八字塔罗运势",
-    page_icon="🔮",
+    page_title="🐲小神龙",
+    page_icon="🐲",
     layout="centered"
 )
 
@@ -717,8 +717,8 @@ def render_chat_interface(birth_info, bazi_info, zodiac):
 
 # -------------------- 页面组件 --------------------
 def render_home_page():
-    st.title("🔮 八字塔罗运势")
-    st.subheader("✨ 输入您的八字信息，探索专属运势")
+    st.title("🐲小神龙")
+    st.subheader("✨ 我是小神龙，欢迎与我交流，探索您的专属推荐")
 
     if not st.session_state.media_indexed:
         with st.spinner("📂 加载媒体资源..."):
