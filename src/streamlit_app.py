@@ -216,7 +216,7 @@ def set_simple_style():
 set_simple_style()
 
 # -------------------- DeepSeek API 客户端 --------------------
-def call_deepseek_api(prompt, max_tokens=300, temperature=0.7, system_role=None):
+def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
     """直接调用DeepSeek API"""
     api_key = "sk-72997944466a4af2bcd52a068895f8cf"
     url = "https://api.deepseek.com/chat/completions"
@@ -226,22 +226,11 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7, system_role=None)
         "Authorization": f"Bearer {api_key}"
     }
     
-    # 默认系统角色 - 专业八字命理师
-    if system_role is None:
-        system_role = """你是一个中国传统八字命理的专业研究人员。
-        你熟读《穷通宝典》、《三命通会》、《滴天髓》、《渊海子平》、《千里命稿》、《协纪辨方书》、《果老星宗》、《子平真诠》、《神峰通考》等一系列经典命理书籍。
-        你精通八字排盘、日主分析、十神配置、大运流年等命理技术。
-        请基于专业的八字命理知识，结合用户的个人信息，给出准确、专业、实用的命理分析。
-        回答时要体现专业深度，同时要温暖贴心，让用户容易理解。"""
-    
-    messages = []
-    if system_role:
-        messages.append({"role": "system", "content": system_role})
-    messages.append({"role": "user", "content": prompt})
-    
     data = {
         "model": "deepseek-chat",
-        "messages": messages,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
         "max_tokens": max_tokens,
         "temperature": temperature,
         "stream": False
@@ -256,64 +245,12 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7, system_role=None)
         st.error(f"API调用失败: {e}")
         return None
 
-# -------------------- 八字计算函数 --------------------
-def calculate_bazi(birth_year, birth_month, birth_day, birth_hour):
-    """计算八字四柱"""
-    # 天干地支基础数据
-    heavenly_stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
-    earthly_branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-    
-    # 简化版八字计算（实际应用中需要更复杂的算法）
-    year_stem = heavenly_stems[(birth_year - 4) % 10]
-    year_branch = earthly_branches[(birth_year - 4) % 12]
-    
-    # 月柱计算（简化）
-    month_stem = heavenly_stems[((birth_year % 5) * 2 + birth_month) % 10]
-    month_branch = earthly_branches[(birth_month + 1) % 12]
-    
-    # 日柱计算（简化）
-    day_stem = heavenly_stems[(birth_day * 2) % 10]
-    day_branch = earthly_branches[birth_day % 12]
-    
-    # 时柱计算
-    hour_map = {
-        "子时(23-1)": 0, "丑时(1-3)": 1, "寅时(3-5)": 2, "卯时(5-7)": 3,
-        "辰时(7-9)": 4, "巳时(9-11)": 5, "午时(11-13)": 6, "未时(13-15)": 7,
-        "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11
-    }
-    hour_index = hour_map.get(birth_hour, 0)
-    hour_stem = heavenly_stems[(day_stem_index * 2 + hour_index) % 10]
-    hour_branch = earthly_branches[hour_index]
-    
-    return {
-        "year": f"{year_stem}{year_branch}",
-        "month": f"{month_stem}{month_branch}",
-        "day": f"{day_stem}{day_branch}",
-        "hour": f"{hour_stem}{hour_branch}"
-    }
-
-def get_day_master(day_pillar):
-    """获取日主（日柱的天干）"""
-    return day_pillar[0]  # 日柱的第一个字就是日主
-
-def get_wuxing_strength(day_master, bazi):
-    """分析五行强弱（简化版）"""
-    # 这里可以添加更复杂的五行分析逻辑
-    wuxing_map = {
-        "甲": "木", "乙": "木", "丙": "火", "丁": "火",
-        "戊": "土", "己": "土", "庚": "金", "辛": "金", 
-        "壬": "水", "癸": "水"
-    }
-    return wuxing_map.get(day_master, "未知")
-
 # -------------------- 会话状态初始化 --------------------
 def init_session_state():
     if "current_page" not in st.session_state:
         st.session_state.current_page = "home"
     if "birth_info" not in st.session_state:
         st.session_state.birth_info = None
-    if "bazi_info" not in st.session_state:
-        st.session_state.bazi_info = None
     if "daily_fortune" not in st.session_state:
         st.session_state.daily_fortune = None
     if "media_indexed" not in st.session_state:
@@ -536,78 +473,21 @@ def display_media(song_meta, zodiac):
         else:
             st.error("音乐文件不存在")
 
-def generate_specific_recommendation(recommendation_type, zodiac, birth_info, bazi_info):
+def generate_specific_recommendation(recommendation_type, zodiac, birth_year, place, birth_hour, gender):
     """生成特定类型的推荐"""
     # 使用本地数据作为降级方案
     local_data = LOCAL_RECOMMENDATIONS.get(recommendation_type, {})
     local_result = local_data.get(zodiac, f"暂无{recommendation_type}的本地推荐数据")
     
-    # 基于八字信息的专业推荐
-    day_master = bazi_info.get('day_master', '未知')
-    wuxing = bazi_info.get('wuxing', '未知')
-    bazi_str = bazi_info.get('bazi_str', '')
-    
     prompts = {
-        "工作类型": f"""基于以下八字信息进行专业命理分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        生肖：{zodiac}
-        性别：{birth_info['gender']}
-        出生地：{birth_info['place']}
-        
-        请根据《穷通宝鉴》和《子平真诠》的理论，分析此命局的十神配置和用神喜忌，
-        推荐3个最适合的职业方向，并说明命理依据。""",
-        
-        "车型": f"""基于八字命理分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        请根据五行喜用神和命局特点，推荐2款最适合的汽车类型，说明五行匹配的理由。""",
-        
-        "工作方位": f"""基于八字风水学分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        请根据《协纪辨方书》的方位理论和命局喜用神，推荐2个最吉利的工作和发展方位。""",
-        
-        "饮食": f"""基于八字五行养生分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        请根据五行平衡原理和体质特点，推荐适合的饮食习惯和3种有益食物。""",
-        
-        "家具布局": f"""基于八字风水布局分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        性别：{birth_info['gender']}
-        
-        请提供3条符合命理的家居风水布局建议。""",
-        
-        "运动": f"""基于八字养生运动分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        推荐3种最适合命主参与的运动锻炼方式。""",
-        
-        "花草绿植": f"""基于八字与植物五行分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        推荐3种最适合命主养护的植物，说明其五行属性和风水作用。""",
-        
-        "电影": f"""基于八字情感需求分析：
-        八字：{bazi_str}
-        日主：{day_master}
-        五行：{wuxing}
-        
-        推荐2部最适合命主观看的电影，结合命理特点说明推荐理由。"""
+        "工作类型": f"基于生肖{zodiac}、{birth_year}年出生、{place}人、{gender}性的特点，推荐3个最适合的工作类型，并说明理由",
+        "车型": f"根据生肖{zodiac}的性格特点和命理，推荐2款最适合的汽车类型，说明为什么适合",
+        "工作方位": f"基于八字命理，为生肖{zodiac}的{gender}性推荐2个最吉利的工作和发展方位",
+        "饮食": f"根据生肖{zodiac}的体质特点，推荐适合的饮食习惯和3种有益食物",
+        "家具布局": f"为生肖{zodiac}的{gender}性提供3条家居风水布局建议",
+        "运动": f"推荐3种最适合生肖{zodiac}的{gender}性参与的运动锻炼方式",
+        "花草绿植": f"推荐3种最适合生肖{zodiac}养护的植物，说明其风水作用",
+        "电影": f"推荐2部最适合生肖{zodiac}的{gender}性观看的电影，并说明推荐理由"
     }
     
     prompt = prompts.get(recommendation_type, "")
@@ -615,7 +495,7 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_info, ba
         return local_result
     
     # 调用DeepSeek API
-    api_result = call_deepseek_api(prompt, max_tokens=400, temperature=0.7)
+    api_result = call_deepseek_api(prompt, max_tokens=300, temperature=0.7)
     
     if api_result:
         return api_result
@@ -631,7 +511,7 @@ def should_regenerate_fortune():
         return True
     return False
 
-def generate_daily_fortune(zodiac, birth_info, bazi_info):
+def generate_daily_fortune(zodiac, birth_info):
     """生成今日运势"""
     # 使用本地运势作为降级方案
     fortunes = [
@@ -643,66 +523,49 @@ def generate_daily_fortune(zodiac, birth_info, bazi_info):
     ]
     local_fortune = random.choice(fortunes)
     
-    day_master = bazi_info.get('day_master', '未知')
-    bazi_str = bazi_info.get('bazi_str', '')
-    
     prompt = f"""
-    请基于专业的八字命理知识，为以下命主分析今日运势：
+    用户生肖：{zodiac}
+    出生年份：{birth_info['year']}
+    性别：{birth_info['gender']}
+    当前日期：{datetime.now().strftime('%Y年%m月%d日')}
     
-    命主信息：
-    - 八字：{bazi_str}
-    - 日主：{day_master}
-    - 生肖：{zodiac}
-    - 性别：{birth_info['gender']}
-    - 当前日期：{datetime.now().strftime('%Y年%m月%d日')}
-    
-    请结合日主强弱、五行喜忌、流日干支等因素，生成简短精准的今日运势分析（80字左右）。
-    语言要专业且温暖，体现命理深度。
+    生成简短精准的今日运势（60字左右），语言温暖、简洁。
     """
 
     # 调用DeepSeek API
-    api_result = call_deepseek_api(prompt, max_tokens=200, temperature=0.7)
+    api_result = call_deepseek_api(prompt, max_tokens=150, temperature=0.7)
     
     if api_result:
         return api_result
     else:
         return local_fortune
 
-def chat_with_ai(user_message, birth_info, bazi_info, zodiac):
+def chat_with_ai(user_message, birth_info, zodiac):
     """与AI聊天"""
     if not birth_info:
         return "请先在主页输入您的八字信息。"
     
     # 使用简单回复作为降级方案
     responses = [
-        "基于您的八字信息，建议保持积极心态，好事自然会来。",
+        "基于您的生肖信息，建议保持积极心态，好事自然会来。",
         f"生肖{zodiac}通常{get_zodiac_description(zodiac).lower()}，在这方面多加发挥会有不错的结果。",
         "这个问题需要更多个人信息来分析，请确保已输入完整的八字信息。",
         "传统命理强调顺势而为，建议根据当前情况灵活调整策略。"
     ]
     local_response = random.choice(responses)
     
-    day_master = bazi_info.get('day_master', '未知')
-    bazi_str = bazi_info.get('bazi_str', '')
-    
     prompt = f"""
-    作为专业的八字命理师，请基于以下命主信息回答问题：
-    
-    命主信息：
-    - 八字：{bazi_str}
-    - 日主：{day_master}
+    用户信息：
     - 生肖：{zodiac}
-    - 性别：{birth_info['gender']}
-    - 出生地：{birth_info['place']}
+    - 出生年份：{birth_info['year']}
     
     用户问题：{user_message}
     
-    请结合《三命通会》、《滴天髓》等经典命理著作的理论，给出专业、准确且实用的命理分析。
-    回答要体现专业深度，同时要温暖贴心，让用户容易理解。
+    请基于用户的八字信息和生肖特点，给出专业、温暖的回答。
     """
     
     # 调用DeepSeek API
-    api_result = call_deepseek_api(prompt, max_tokens=500, temperature=0.7)
+    api_result = call_deepseek_api(prompt, max_tokens=300, temperature=0.7)
     
     if api_result:
         return api_result
@@ -718,24 +581,23 @@ def render_chat_interface():
         if message["role"] == "user":
             st.markdown(f"**👤 您：** {message['content']}")
         else:
-            st.markdown(f"**🔮 命理师：** {message['content']}")
+            st.markdown(f"**🔮 运势助手：** {message['content']}")
     
     user_question = st.text_input("输入您的问题...", key="chat_input")
     if st.button("发送") and user_question.strip():
         st.session_state.chat_history.append({"role": "user", "content": user_question})
         
-        with st.spinner("🔮 正在运用命理知识分析..."):
+        with st.spinner("🔮 正在思考..."):
             birth_info = st.session_state.birth_info
-            bazi_info = st.session_state.bazi_info
             zodiac = year_to_zodiac(birth_info['year']) if birth_info else "未知"
-            ai_response = chat_with_ai(user_question, birth_info, bazi_info, zodiac)
+            ai_response = chat_with_ai(user_question, birth_info, zodiac)
             st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
         st.rerun()
 
 # -------------------- 页面组件 --------------------
 def render_home_page():
-    st.title("🔮 八字命理运势分析")
-    st.subheader("✨ 输入您的八字信息，获取专业命理分析")
+    st.title("🔮 八字塔罗运势")
+    st.subheader("✨ 输入您的八字信息，探索专属运势")
 
     if not st.session_state.media_indexed:
         with st.spinner("📂 加载媒体资源..."):
@@ -757,26 +619,12 @@ def render_home_page():
         birth_place = st.text_input("出生地点", placeholder="例如：北京、上海")
         gender = st.selectbox("性别", options=["男", "女"])
         
-        if st.form_submit_button("🚀 生成八字命盘"):
+        if st.form_submit_button("🚀 保存八字信息"):
             if birth_place.strip():
                 st.session_state.birth_info = {
                     "year": birth_year, "month": birth_month, "day": birth_day,
                     "hour": birth_hour, "place": birth_place, "gender": gender
                 }
-                
-                # 计算八字信息
-                with st.spinner("📊 正在计算八字命盘..."):
-                    bazi = calculate_bazi(birth_year, birth_month, birth_day, birth_hour)
-                    day_master = get_day_master(bazi['day'])
-                    wuxing = get_wuxing_strength(day_master, bazi)
-                    
-                    st.session_state.bazi_info = {
-                        'bazi': bazi,
-                        'bazi_str': f"{bazi['year']} {bazi['month']} {bazi['day']} {bazi['hour']}",
-                        'day_master': day_master,
-                        'wuxing': wuxing
-                    }
-                
                 st.success("✅ 八字信息已保存！")
                 st.session_state.daily_fortune = None
                 st.session_state.personal_recommendations = {}
@@ -784,25 +632,148 @@ def render_home_page():
             else:
                 st.warning("请输入出生地点")
 
-    if st.session_state.birth_info and st.session_state.bazi_info:
+    if st.session_state.birth_info:
         zodiac = year_to_zodiac(st.session_state.birth_info['year'])
-        bazi_info = st.session_state.bazi_info
-        
-        # 显示八字命盘
-        st.markdown("### 📜 您的八字命盘")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("年柱", bazi_info['bazi']['year'])
-        with col2:
-            st.metric("月柱", bazi_info['bazi']['month'])
-        with col3:
-            st.metric("日柱", bazi_info['bazi']['day'])
-        with col4:
-            st.metric("时柱", bazi_info['bazi']['hour'])
-        
-        st.metric("日主", f"{bazi_info['day_master']} ({bazi_info['wuxing']})")
-        
         st.markdown(f"""
         <div class="zodiac-section">
             <h1>{get_zodiac_emoji(zodiac)} {zodiac}</h1>
-        )
+            <h3>{get_zodiac_description(zodiac)}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📅 查看今日运势", use_container_width=True):
+                st.session_state.current_page = "daily"
+                st.rerun()
+        with col2:
+            if st.button("🌟 查看个性推荐", use_container_width=True):
+                st.session_state.current_page = "personal"
+                st.rerun()
+
+def render_daily_fortune():
+    st.title("📅 今日运势")
+    
+    if not st.session_state.birth_info:
+        st.warning("请先在主页面输入八字信息")
+        if st.button("返回主页"):
+            st.session_state.current_page = "home"
+            st.rerun()
+        return
+
+    birth_info = st.session_state.birth_info
+    zodiac = year_to_zodiac(birth_info['year'])
+    
+    # 个人生肖守护灵
+    st.subheader("✨ 个人生肖守护灵")
+    guardian_spirit = get_guardian_spirit(zodiac)
+    st.markdown(f"""
+    <div class="guardian-spirit">
+        <h3>🌟 {guardian_spirit.split(' - ')[0]} 🌟</h3>
+        <p>{guardian_spirit.split(' - ')[1]}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 今日运势
+    st.subheader("🎯 今日运势")
+    should_regenerate_fortune()
+    
+    if st.session_state.daily_fortune is None:
+        with st.spinner("🔮 正在占卜今日运势..."):
+            st.session_state.daily_fortune = generate_daily_fortune(zodiac, birth_info)
+
+    st.info(st.session_state.daily_fortune)
+
+    # 音乐推荐
+    st.subheader("🎶 今日守护音乐")
+    if st.session_state.songs_meta:
+        matched_songs = match_song_by_text(st.session_state.daily_fortune, 1)
+        if matched_songs:
+            display_media(matched_songs[0][1], zodiac)
+
+    render_chat_interface()
+    
+    if st.button("🔙 返回主页"):
+        st.session_state.current_page = "home"
+        st.rerun()
+
+def render_personal_recommendation():
+    st.title("🌟 个性推荐")
+    
+    if not st.session_state.birth_info:
+        st.warning("请先在主页面输入八字信息")
+        if st.button("返回主页"):
+            st.session_state.current_page = "home"
+            st.rerun()
+        return
+
+    birth_info = st.session_state.birth_info
+    zodiac = year_to_zodiac(birth_info['year'])
+    
+    # 推荐类型按钮
+    st.subheader("🎯 选择推荐类型")
+    
+    recommendation_types = {
+        "💼 工作类型": "工作类型",
+        "🚗 车型推荐": "车型", 
+        "🧭 工作方位": "工作方位",
+        "🍽️ 饮食建议": "饮食",
+        "🏠 家具布局": "家具布局",
+        "🏃 运动推荐": "运动",
+        "🌿 花草绿植": "花草绿植",
+        "🎬 电影推荐": "电影"
+    }
+    
+    # 创建按钮网格
+    cols = st.columns(4)
+    for idx, (display_name, rec_type) in enumerate(recommendation_types.items()):
+        with cols[idx % 4]:
+            if st.button(display_name, use_container_width=True, key=f"btn_{rec_type}"):
+                st.session_state.recommendation_type = rec_type
+                st.rerun()
+    
+    # 显示选中的推荐内容
+    if st.session_state.recommendation_type:
+        st.subheader(f"📋 {[k for k, v in recommendation_types.items() if v == st.session_state.recommendation_type][0]}")
+        
+        if st.session_state.recommendation_type in st.session_state.personal_recommendations:
+            recommendation_content = st.session_state.personal_recommendations[st.session_state.recommendation_type]
+        else:
+            with st.spinner("🔮 正在生成推荐..."):
+                recommendation_content = generate_specific_recommendation(
+                    st.session_state.recommendation_type,
+                    zodiac, birth_info['year'], birth_info['place'], 
+                    birth_info['hour'], birth_info['gender']
+                )
+                st.session_state.personal_recommendations[st.session_state.recommendation_type] = recommendation_content
+        
+        st.markdown(f"""
+        <div class="recommendation-card">
+            {recommendation_content}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("👆 请选择上方的推荐类型来查看具体建议")
+
+    render_chat_interface()
+    
+    if st.button("🔙 返回主页"):
+        st.session_state.current_page = "home"
+        st.rerun()
+
+# -------------------- 主程序入口 --------------------
+def main():
+    # 设置背景视频
+    if st.session_state.background_video is None:
+        setup_background_video()
+    
+    # 页面路由
+    if st.session_state.current_page == "home":
+        render_home_page()
+    elif st.session_state.current_page == "daily":
+        render_daily_fortune()
+    elif st.session_state.current_page == "personal":
+        render_personal_recommendation()
+
+if __name__ == "__main__":
+    main()
