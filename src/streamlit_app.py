@@ -550,7 +550,7 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_info, ba
         日主：{day_master}
         五行：{wuxing}
         
-        请根据五行喜用神和命局特点，推荐2款最适合的汽车类型，说明五行匹配的理由。""",
+        请根据五行喜用神和命局特点，推荐2款最适合的汽车类型与常见品牌，说明五行匹配的理由。""",
         
         "工作方位": f"""基于八字风水学分析：
         八字：{bazi_str}
