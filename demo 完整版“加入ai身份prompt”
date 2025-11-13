@@ -541,28 +541,28 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_info, ba
         性别：{birth_info['gender']}
         
         请根据《穷通宝鉴》和《子平真诠》的理论，分析此命局的十神配置和用神喜忌，
-        推荐3个最适合的职业方向，并说明命理依据。""",
+        简要推荐3个最适合的职业方向，并说明命理依据。""",
         
         "车型": f"""基于八字命理分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        请根据五行喜用神和命局特点，推荐2款最适合的汽车类型与常见品牌，说明五行匹配的理由。""",
+        请根据五行喜用神和命局特点，简要推荐2款最适合的汽车类型与常见品牌，说明五行匹配的理由。""",
         
         "工作方位": f"""基于八字风水学分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        请根据《协纪辨方书》的方位理论和命局喜用神，推荐2个最吉利的工作和发展方位。""",
+        请根据《协纪辨方书》的方位理论和命局喜用神，简要推荐2个最吉利的工作和发展方位。""",
         
         "饮食": f"""基于八字五行养生分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        请根据五行平衡原理和体质特点，推荐适合的饮食习惯和3种有益食物。""",
+        请根据五行平衡原理和体质特点，简要推荐适合的饮食习惯和3种有益食物。""",
         
         "家具布局": f"""基于八字风水布局分析：
         八字：{bazi_str}
@@ -570,28 +570,28 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_info, ba
         五行：{wuxing}
         性别：{birth_info['gender']}
         
-        请提供3条符合命理的家居风水布局建议。""",
+        请简要提供3条符合命理的家居风水布局建议。""",
         
         "运动": f"""基于八字养生运动分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        推荐3种最适合命主参与的运动锻炼方式。""",
+        简要推荐3种最适合命主参与的运动锻炼方式。""",
         
         "花草绿植": f"""基于八字与植物五行分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        推荐3种最适合命主养护的植物，说明其五行属性和风水作用。""",
+        简要推荐3种最适合命主养护的植物，说明其五行属性和风水作用。""",
         
         "电影": f"""基于八字情感需求分析：
         八字：{bazi_str}
         日主：{day_master}
         五行：{wuxing}
         
-        推荐2部最适合命主观看的电影，结合命理特点说明推荐理由。"""
+        简要推荐2部最适合命主观看的电影，结合命理特点说明推荐理由。"""
     }
     
     prompt = prompts.get(recommendation_type, "")
@@ -599,7 +599,7 @@ def generate_specific_recommendation(recommendation_type, zodiac, birth_info, ba
         return local_result
     
     # 调用DeepSeek API
-    api_result = call_deepseek_api(prompt, max_tokens=400, temperature=0.7)
+    api_result = call_deepseek_api(prompt, max_tokens=450, temperature=0.7)
     
     if api_result:
         return api_result
