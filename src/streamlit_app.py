@@ -7,7 +7,6 @@ import random
 import base64
 import requests
 import json
-from lunar_python import Lunar, Solar
 
 # 页面配置
 st.set_page_config(
@@ -252,61 +251,35 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
         st.error(f"API调用失败: {e}")
         return None
 
-# -------------------- 八字计算函数（使用lunar_python库）-------------------
-def calculate_bazi_lunar(gregorian_year, gregorian_month, gregorian_day, birth_hour):
+# -------------------- 八字计算函数（不依赖外部农历库）-------------------
+def calculate_bazi(year, month, day, birth_hour):
     """
-    基于农历计算八字（需输入公历日期）
-    :param gregorian_year: 公历年
-    :param gregorian_month: 公历月
-    :param gregorian_day: 公历日
-    :param birth_hour: 时辰字符串，如"子时(23-1)"
+    计算八字四柱（简化版，不依赖农历库）
+    :param year: 公历年
+    :param month: 公历月
+    :param day: 公历日
+    :param birth_hour: 时辰字符串
     :return: 八字四柱字典
     """
-    try:
-        # 将公历转换为农历
-        solar = Solar.fromYmd(gregorian_year, gregorian_month, gregorian_day)
-        lunar = solar.getLunar()
-        
-        # 获取八字四柱
-        year_gan_zhi = lunar.getYearInGanZhi()  # 年柱
-        month_gan_zhi = lunar.getMonthInGanZhi()  # 月柱
-        day_gan_zhi = lunar.getDayInGanZhi()  # 日柱
-        
-        # 时柱计算
-        hour_map = {
-            "子时(23-1)": 0, "丑时(1-3)": 1, "寅时(3-5)": 2, "卯时(5-7)": 3,
-            "辰时(7-9)": 4, "巳时(9-11)": 5, "午时(11-13)": 6, "未时(13-15)": 7,
-            "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11
-        }
-        hour_index = hour_map.get(birth_hour, 0)
-        hour_gan_zhi = lunar.getTimeInGanZhi(hour_index)  # 时柱
-        
-        return {
-            "year": year_gan_zhi,
-            "month": month_gan_zhi,
-            "day": day_gan_zhi,
-            "hour": hour_gan_zhi
-        }
-    except Exception as e:
-        st.error(f"八字计算错误: {e}")
-        # 降级方案：使用简化计算
-        return calculate_bazi_simple(gregorian_year, gregorian_month, gregorian_day, birth_hour)
-
-def calculate_bazi_simple(year, month, day, birth_hour):
-    """简化版八字计算（备用方案）"""
     # 天干地支基础数据
     heavenly_stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     earthly_branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
     
-    # 年柱计算
+    # 年柱计算（基于公历年，简化处理）
     year_stem = heavenly_stems[(year - 4) % 10]
     year_branch = earthly_branches[(year - 4) % 12]
     
-    # 月柱计算（简化）
-    month_stem = heavenly_stems[((year % 5) * 2 + month) % 10]
+    # 月柱计算（简化，基于公历月）
+    # 月支：正月寅、二月卯、三月辰...十二月丑
     month_branch = earthly_branches[(month + 1) % 12]
     
-    # 日柱计算（简化）
+    # 月干计算（年上起月法：甲己之年丙作首，乙庚之岁戊为头...）
+    year_stem_index = heavenly_stems.index(year_stem)
+    month_stem_index = (year_stem_index * 2 + 2) % 10  # 简化公式
+    month_stem = heavenly_stems[month_stem_index]
+    
+    # 日柱计算（简化，基于公历日）
+    # 实际应用中应该使用精确的日干支计算，这里用简化方法
     day_stem_index = (day * 2) % 10
     day_stem = heavenly_stems[day_stem_index]
     day_branch = earthly_branches[day % 12]
@@ -318,7 +291,10 @@ def calculate_bazi_simple(year, month, day, birth_hour):
         "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11
     }
     hour_index = hour_map.get(birth_hour, 0)
-    hour_stem = heavenly_stems[(day_stem_index * 2 + hour_index) % 10]
+    
+    # 时干计算（日上起时法：甲己还加甲，乙庚丙作初...）
+    hour_stem_index = (day_stem_index * 2 + hour_index) % 10
+    hour_stem = heavenly_stems[hour_stem_index]
     hour_branch = earthly_branches[hour_index]
     
     return {
@@ -785,9 +761,9 @@ def render_home_page():
                     "hour": birth_hour, "place": birth_place, "gender": gender
                 }
                 
-                # 计算八字信息 - 使用农历库计算
+                # 计算八字信息 - 使用简化版计算
                 with st.spinner("📊 正在计算八字命盘..."):
-                    bazi = calculate_bazi_lunar(birth_year, birth_month, birth_day, birth_hour)
+                    bazi = calculate_bazi(birth_year, birth_month, birth_day, birth_hour)
                     day_master = get_day_master(bazi['day'])
                     wuxing = get_wuxing_strength(day_master)
                     
