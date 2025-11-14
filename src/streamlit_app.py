@@ -229,7 +229,7 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
     
     # 专业的八字命理师系统提示
     system_prompt = """你现在是一个中国传统八字命理的专业研究人员。你熟读《穷通宝典》、《 三命通会  》、《滴天髓》、《渊海子平》这些书籍。你熟读《千里命稿》、《协纪辨方书》、《果老星宗》、《子平真诠》、《神峰通考》一系列书籍。  
-根据“排大运分阳年、阴年。阳年：甲丙戊庚壬。阴年：乙丁己辛癸，阳年男，阴年女为顺排，阴年男，阳年女为逆排，具体排法以月干支为基准，进行顺逆。
+根据"排大运分阳年、阴年。阳年：甲丙戊庚壬。阴年：乙丁己辛癸，阳年男，阴年女为顺排，阴年男，阳年女为逆排，具体排法以月干支为基准，进行顺逆。
 小孩交大运前，以月柱干支为大运。十天干：甲乙丙丁戊己庚辛壬癸，十二地支：子丑寅卯辰巳午未申酉戌亥。"""
     
     data = {
@@ -252,6 +252,7 @@ def call_deepseek_api(prompt, max_tokens=300, temperature=0.7):
         st.error(f"API调用失败: {e}")
         return None
 
+# -------------------- 八字计算函数（使用lunar_python库）-------------------
 def calculate_bazi_lunar(gregorian_year, gregorian_month, gregorian_day, birth_hour):
     """
     基于农历计算八字（需输入公历日期）
@@ -261,69 +262,70 @@ def calculate_bazi_lunar(gregorian_year, gregorian_month, gregorian_day, birth_h
     :param birth_hour: 时辰字符串，如"子时(23-1)"
     :return: 八字四柱字典
     """
+    try:
+        # 将公历转换为农历
+        solar = Solar.fromYmd(gregorian_year, gregorian_month, gregorian_day)
+        lunar = solar.getLunar()
+        
+        # 获取八字四柱
+        year_gan_zhi = lunar.getYearInGanZhi()  # 年柱
+        month_gan_zhi = lunar.getMonthInGanZhi()  # 月柱
+        day_gan_zhi = lunar.getDayInGanZhi()  # 日柱
+        
+        # 时柱计算
+        hour_map = {
+            "子时(23-1)": 0, "丑时(1-3)": 1, "寅时(3-5)": 2, "卯时(5-7)": 3,
+            "辰时(7-9)": 4, "巳时(9-11)": 5, "午时(11-13)": 6, "未时(13-15)": 7,
+            "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11
+        }
+        hour_index = hour_map.get(birth_hour, 0)
+        hour_gan_zhi = lunar.getTimeInGanZhi(hour_index)  # 时柱
+        
+        return {
+            "year": year_gan_zhi,
+            "month": month_gan_zhi,
+            "day": day_gan_zhi,
+            "hour": hour_gan_zhi
+        }
+    except Exception as e:
+        st.error(f"八字计算错误: {e}")
+        # 降级方案：使用简化计算
+        return calculate_bazi_simple(gregorian_year, gregorian_month, gregorian_day, birth_hour)
+
+def calculate_bazi_simple(year, month, day, birth_hour):
+    """简化版八字计算（备用方案）"""
     # 天干地支基础数据
     heavenly_stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     earthly_branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-    # 节气对应的月份地支（节气是月柱的划分标准）
-    solar_term_to_branch = {
-        "立春": "寅", "惊蛰": "卯", "清明": "辰", "立夏": "巳",
-        "芒种": "午", "小暑": "未", "立秋": "申", "白露": "酉",
-        "寒露": "戌", "立冬": "亥", "大雪": "子", "小寒": "丑"
-    }
-
-    # 1. 公历转农历及节气
-    solar = Solar.fromYmd(gregorian_year, gregorian_month, gregorian_day)
-    lunar = solar.getLunar()  # 农历对象
-    # 获取当天及前后的节气（用于判断月柱）
-    prev_term = solar.getPrevSolarTerm()  # 前一个节气
-    next_term = solar.getNextSolarTerm()  # 后一个节气
-
-    # 2. 年柱计算（农历年）
-    lunar_year = lunar.getYear()
-    year_stem = heavenly_stems[(lunar_year - 4) % 10]  # 农历年天干（以4年为甲年基准）
-    year_branch = earthly_branches[(lunar_year - 4) % 12]  # 农历年地支
-    year_pillar = f"{year_stem}{year_branch}"
-
-    # 3. 月柱计算（以节气划分，非农历月份）
-    # 确定当前节气所属的月份地支
-    current_month_branch = None
-    for term, branch in solar_term_to_branch.items():
-        if prev_term.getName() == term:
-            current_month_branch = branch
-            break
-    if not current_month_branch:
-        current_month_branch = "寅"  # 默认立春后为寅月（ fallback ）
-    # 月干 = 年干对应的五虎遁（简化：甲己起丙寅，乙庚起戊寅...）
-    year_stem_index = heavenly_stems.index(year_stem)
-    month_stem_index = (year_stem_index * 2 + 2) % 10  # 五虎遁简化公式
-    month_stem = heavenly_stems[month_stem_index]
-    month_pillar = f"{month_stem}{current_month_branch}"
-
-    # 4. 日柱计算（基于农历日的干支，此处简化，精确需查干支表）
-    # 实际应用中需用精确的干支纪日（可通过lunar.getDayGanZhi()直接获取）
-    day_gan_zhi = lunar.getDayGanZhi()  # 农历日的干支（直接从库中获取，更准确）
-    day_pillar = day_gan_zhi
-
-    # 5. 时柱计算（基于日干的五鼠遁）
+    
+    # 年柱计算
+    year_stem = heavenly_stems[(year - 4) % 10]
+    year_branch = earthly_branches[(year - 4) % 12]
+    
+    # 月柱计算（简化）
+    month_stem = heavenly_stems[((year % 5) * 2 + month) % 10]
+    month_branch = earthly_branches[(month + 1) % 12]
+    
+    # 日柱计算（简化）
+    day_stem_index = (day * 2) % 10
+    day_stem = heavenly_stems[day_stem_index]
+    day_branch = earthly_branches[day % 12]
+    
+    # 时柱计算
     hour_map = {
         "子时(23-1)": 0, "丑时(1-3)": 1, "寅时(3-5)": 2, "卯时(5-7)": 3,
         "辰时(7-9)": 4, "巳时(9-11)": 5, "午时(11-13)": 6, "未时(13-15)": 7,
         "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11
     }
     hour_index = hour_map.get(birth_hour, 0)
-    day_stem = day_gan_zhi[0]  # 日干
-    day_stem_index = heavenly_stems.index(day_stem)
-    # 时干 = 日干对应的五鼠遁（简化公式）
-    hour_stem_index = (day_stem_index * 2 + hour_index) % 10
-    hour_stem = heavenly_stems[hour_stem_index]
+    hour_stem = heavenly_stems[(day_stem_index * 2 + hour_index) % 10]
     hour_branch = earthly_branches[hour_index]
-    hour_pillar = f"{hour_stem}{hour_branch}"
-
+    
     return {
-        "year": year_pillar,
-        "month": month_pillar,
-        "day": day_pillar,
-        "hour": hour_pillar
+        "year": f"{year_stem}{year_branch}",
+        "month": f"{month_stem}{month_branch}",
+        "day": f"{day_stem}{day_branch}",
+        "hour": f"{hour_stem}{hour_branch}"
     }
 
 def get_day_master(day_pillar):
@@ -486,7 +488,7 @@ def load_media_resources():
         st.session_state.zodiac_videos = zodiac_videos
         st.session_state.media_indexed = True
         
-        st.success(f"")
+        st.success(f"✅ 加载了 {len(songs)} 首音乐, {len(all_images)} 张图片和 {len(zodiac_videos)} 个生肖动图")
         
     except Exception as e:
         st.error(f"加载媒体资源时出错: {e}")
@@ -783,9 +785,9 @@ def render_home_page():
                     "hour": birth_hour, "place": birth_place, "gender": gender
                 }
                 
-                # 计算八字信息
+                # 计算八字信息 - 使用农历库计算
                 with st.spinner("📊 正在计算八字命盘..."):
-                    bazi = calculate_bazi(birth_year, birth_month, birth_day, birth_hour)
+                    bazi = calculate_bazi_lunar(birth_year, birth_month, birth_day, birth_hour)
                     day_master = get_day_master(bazi['day'])
                     wuxing = get_wuxing_strength(day_master)
                     
