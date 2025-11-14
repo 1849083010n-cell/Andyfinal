@@ -7,6 +7,7 @@ import random
 import base64
 import requests
 import json
+from lunar_python import Lunar, Solar
 
 # 页面配置
 st.set_page_config(
